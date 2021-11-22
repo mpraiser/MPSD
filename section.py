@@ -72,13 +72,6 @@ class Section:
         # template of sub-sections, only used in variable section
         self.sub_sections_template = sub_sections_template if sub_sections_template else []
 
-        # dependency
-        self.dependencies: list[tuple] = []
-        if self.parent:
-            self.dependencies.append(
-                self.parent
-            )
-
         # properties for parsing
         self.handler = handler  # value = handler(raw)
         self.unit = unit
@@ -92,16 +85,11 @@ class Section:
     def add_child(self, child):
         self.children.append(child)
 
-    def add_dependency(self, dependency):
-        self.dependencies.append(dependency)
-
-    def set_raw(self, raw: bytes):
-        """set raw and length"""
-        self.raw = raw
-        self.size = len(raw)
-
     def is_leaf(self):
         return len(self.children) == 0
+
+    def is_root(self):
+        return self.parent is None
 
     def leaves(self):
         def __leaves(node: Section):
@@ -123,6 +111,14 @@ class Section:
                 "size": self.size,
                 "value": self.value
             }
+
+    def __iter__(self):
+        for child in self.children:
+            if child.is_leaf():
+                yield child.label, child.value
+            else:
+                d = {k: v for k, v in iter(child)}
+                yield child.label, d
 
     def show(self):
         """BFS to print self"""
@@ -204,7 +200,7 @@ class Section:
                 else:
                     yield sibling
 
-    def handle_size_dependency(self):
+    def handle_size_dependency(self) -> int:
         """
         :return: size of self after dependency is handled
         """
@@ -216,7 +212,8 @@ class Section:
         if not dependency.value:
             raise Exception(f"Dependency '{label}' is not parsed.")
         size = handler(dependency.value)
-        self.size = size
+        # self.size = size
+        return size
 
     def add_sub_section_template(self, sub_section_template):
         assert self.is_variable_section
@@ -253,3 +250,95 @@ class Section:
             sub_section.add_child(child)
         self.list_len += 1
         return sub_section
+
+    def parse(self, raw: bytes) -> int:
+        """
+        :param raw:
+        :return: number of bytes used
+        """
+        if self.is_variable_section:
+            return self.__parse_variable(raw)
+        else:
+            return self.__parse_non_variable(raw)
+
+    def __set(self, raw: bytes) -> int:
+        """set raw bytes of self"""
+        self.raw = raw
+        self.size = len(raw)
+        if self.is_leaf():
+            self.value = self.handler(self.raw)
+        return self.size
+
+    def __parse_non_variable(self, raw: bytes) -> int:
+        # dispatch according to type of self.size
+        if isinstance(self.size, int):
+            return self.__parse_size_policy_fixed(raw)
+        elif isinstance(self.size, DependencySpec):
+            return self.__parse_size_policy_dependency(raw)
+        elif isinstance(self.size, SizePolicy):
+            policy = self.size
+            if policy == SizePolicy.auto:
+                return self.__parse_size_policy_auto(raw)
+            elif policy == SizePolicy.greedy:
+                return self.__parse_size_policy_greedy(raw)
+            else:
+                raise Exception(f"Section '{self.label}' unsupported size policy: {policy}")
+        else:
+            raise Exception(f"Section '{self.label}' unsupported size type: {type(self.size)}")
+
+    def __parse_size_policy_fixed(self, raw: bytes) -> int:
+        # do pre-order
+        used = self.__set(raw[:self.size])
+        child_used = 0
+        for child in self.children:
+            child_used += child.parse(self.raw[child_used:])
+        if not self.is_leaf() and child_used < self.size:
+            print(f"Warning: raw of {self.label} not all used by child sections.")
+        return used
+
+    def __parse_size_policy_auto(self, raw: bytes) -> int:
+        # do post-order
+        used = 0
+        for child in self.children:
+            used += child.parse(raw[used:])
+        self.__set(raw[:used])
+        return used
+
+    def __parse_size_policy_greedy(self, raw: bytes) -> int:
+        used = self.__set(raw)
+        # TODO: greedy condition check
+        return used
+
+    def __parse_size_policy_dependency(self, raw: bytes) -> int:
+        size = self.handle_size_dependency()
+        used = self.__set(raw[:size])
+        child_used = 0
+        for child in self.children:
+            child_used += child.parse(self.raw[child_used:])
+        if not self.is_leaf() and child_used < self.size:
+            print(f"Warning: raw of {self.label} not all used by child sections.")
+        return used
+
+    def __parse_variable(self, raw: bytes) -> int:
+        assert self.is_variable_section
+        used = 0
+        list_len = 0
+        if isinstance(self.list_len, int):
+            max_list_len = self.list_len
+        elif isinstance(self.list_len, ListLenPolicy):
+            policy = self.list_len
+            if policy == ListLenPolicy.greedy:
+                max_list_len = None
+            else:
+                raise Exception(f"Section '{self.label}' unsupported list len policy: {policy}")
+        else:
+            raise Exception(f"Section '{self.label}' unsupported list len type: {type(self.size)}")
+
+        while used < len(raw) and ((not max_list_len) or max_list_len and list_len <= max_list_len):
+            sub_section = self.create_sub_section()
+            size = sub_section.parse(raw[used:])
+            used += size
+            self.add_child(sub_section)
+            list_len += 1
+        self.list_len = list_len
+        return used

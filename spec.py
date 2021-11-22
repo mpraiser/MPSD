@@ -11,7 +11,7 @@ def is_variable_section(section: str):
     return section.startswith("@")
 
 
-def spec_load(root_spec: dict, root_label: str) -> Section:
+def load(root_spec: dict, root_label: str = "") -> Section:
     """Parse a spec dict to a Tree"""
     PROPERTIES = "_properties"
 

@@ -28,17 +28,3 @@ def dict_struct_copy(src: dict, dst=None):
         if type(src[key]) == dict:
             dict_struct_copy(src[key], dst[key])
     return dst
-
-
-# def parse(spec: dict, data: bytes):
-#     properties = dict()
-#     byte_ptr = 0
-#     bit_ptr = 0
-#
-#     def f(spec):
-#         nonlocal spec
-#         for field in spec:
-#             if type(field) == dict:
-#                 f(spec[field])
-#             else:
-#                 pass
