@@ -1,6 +1,6 @@
 from section import byte, SizePolicy, ListLenPolicy, DependencySpec
-from spec import spec_load
-from parse import parse
+from specification import load
+from section import Section
 
 
 def handler_type(x: bytes) -> str:
@@ -27,7 +27,7 @@ def handler_schedule_type_size(typ: bytes) -> int:
     return __dict[typ]
 
 
-my_spec = {
+spec = {
     "header": {
         "type": {
             "_properties": {
@@ -88,21 +88,8 @@ my_spec = {
         }
     }
 }
-
-
-class TestSpec:
-    pass
-
-
-spec = spec_load(my_spec, "my_frame")
-# spec.show()
-
-# print("-----------")
-#
-# for leaf in spec.leaves():
-#     print(leaf.property_dict())
-
 raw = b"\x01\x0a\xaa\xaa\x00\x03\x04\x01\x05\x06\x07\x08\xff\xff"
-used = parse(spec, raw)
-spec.show()
+root: Section = load(spec)
+used = root.parse(raw)
+root.show()
 print(f"len(raw) = {len(raw)}, used = {used}")

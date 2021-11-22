@@ -14,7 +14,6 @@ class SizePolicy(Enum):
     """section size policy"""
     static = "static"  # fixed size
     auto = "auto"  # size is sum of children
-    placeholder = "placeholder"  # only used in root
     greedy = "greedy"  # size is all remaining raw bytes, except fixed size of right child
     dependency = "dependency"
 
@@ -202,7 +201,7 @@ class Section:
 
     def handle_size_dependency(self) -> int:
         """
-        :return: size of self after dependency is handled
+        :return: size value according to dependency
         """
         assert isinstance(self.size, DependencySpec)
         handler, label = self.size

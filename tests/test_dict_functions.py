@@ -39,5 +39,4 @@ class TestDictFunctions:
 
 
 if __name__ == "__main__":
-    pytest.main()
-    # TestDictFunctions().test_dict_struct_copy()
+    pytest.main(["test_dict_functions.py"])

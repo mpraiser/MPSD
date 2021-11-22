@@ -1,5 +1,4 @@
 from typing import Optional
-
 from section import Section, SizePolicy, byte
 
 
