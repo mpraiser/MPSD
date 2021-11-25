@@ -1,5 +1,4 @@
 from section import byte, DependencySpec
-from functools import partial
 
 
 def hex2int(x: bytes):

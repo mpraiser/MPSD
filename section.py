@@ -9,6 +9,20 @@ class Unit(Enum):
     byte = "byte"
     bit = "bit"
 
+    @classmethod
+    def table(cls):
+        return {
+            item.value: item for item in cls
+        }
+
+    @staticmethod
+    def from_str(s: str):
+        return Unit.table()[s]
+
+    @staticmethod
+    def is_valid(s: str):
+        return s in Unit.table()
+
 
 class SizePolicy(Enum):
     """section size policy"""
