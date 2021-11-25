@@ -217,8 +217,9 @@ class Section:
         """
         :return: size value according to dependency
         """
-        assert isinstance(self.size, DependencySpec)
+        assert isinstance(self.size, tuple)
         handler, label = self.size
+        # TODO: support multiple dependencies
         dependency = self.find_in_ancestor_left_sub_tree(label)
         if not dependency:
             raise Exception(f"Dependency '{label}' is not found.")
@@ -286,7 +287,7 @@ class Section:
         # dispatch according to type of self.size
         if isinstance(self.size, int):
             return self.__parse_size_policy_fixed(raw)
-        elif isinstance(self.size, DependencySpec):
+        elif isinstance(self.size, tuple):
             return self.__parse_size_policy_dependency(raw)
         elif isinstance(self.size, SizePolicy):
             policy = self.size

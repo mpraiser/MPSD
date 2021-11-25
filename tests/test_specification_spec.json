@@ -1,0 +1,35 @@
+{
+    "src_port": {
+        "_properties": {
+            "size": 2,
+            "handler": "#bytes2int_b"
+        }
+    },
+    "dst_port": {
+        "_properties": {
+            "size": 2,
+            "handler": "#bytes2int_b"
+        }
+    },
+    "length": {
+        "_properties": {
+            "size": 2,
+            "handler": "#bytes2int_b"
+        }
+    },
+    "checksum": {
+        "_properties": {
+            "size": 2,
+            "handler": "#bytes2int_b"
+        }
+    },
+    "data": {
+        "_properties": {
+            "size": [
+                "#identity",
+                "length"
+            ],
+            "handler": "#bytes2hex"
+        }
+    }
+}

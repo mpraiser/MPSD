@@ -125,6 +125,8 @@ def check_properties(prop: dict, is_variable: bool):
                 raise Exception(f"the first argument should be handler.")
             else:
                 prop["size"][0] = handler_handler(prop["size"][0])
+            prop["size"] = tuple(prop["size"])
+
         elif isinstance(prop["size"], str):
             if Unit.is_valid(prop["size"]):
                 prop["size"] = Unit[prop["size"]]
@@ -150,12 +152,13 @@ def decode(s: str) -> dict:
     blank = json.JSONDecoder().decode(s)
 
     def postorder(dct: dict, label: str) -> dict:
-        processed = []
         for key, raw in dct.items():
-            if isinstance(raw, dict):
-                sub = postorder(raw, key)
-                processed.append((key, sub))
-        create_properties(dct, label)
+            if key != PROPERTIES and isinstance(raw, dict):
+                postorder(raw, key)
+
+        if PROPERTIES not in dct:
+            dct[PROPERTIES] = {}
+        check_properties(dct[PROPERTIES], is_variable_section(label))
         return dct
 
     return postorder(blank, "")

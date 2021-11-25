@@ -1,16 +1,15 @@
-from spec import spec
-from specification import load
+from pprint import pprint
+from specification import load, decode
+from handler import hex2bytes
 
+with open("udp.json", "r") as fp:
+    spec = decode(fp.read())
+    print(spec)
 
-def hex2bytes(gid: str) -> bytes:
-    return bytes(
-        int(gid[i:i + 2], base=16) for i in range(0, len(gid), 2)
-    )
-
-
-raw = "30391f40004ed20f2058866fffced06be212befd51b94c35d4d516568fc6b2de53d9a4bf665d747aa7f63da1a92982f27996b0f84ca9c4a87af7d3208864b35c17e207d52788afc270a359fc498e"
-raw = hex2bytes(raw)
-root = load(spec)
-root.parse(raw)
-print(dict(root))
-
+with open("raw_bytes.txt", "r") as fp:
+    raw_bytes = [hex2bytes(x.strip()) for x in fp]
+    for i, raw in enumerate(raw_bytes):
+        message = load(spec)
+        message.parse(raw)
+        print(f"Message {i}: {raw}")
+        pprint(dict(message), sort_dicts=False)

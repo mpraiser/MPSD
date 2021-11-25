@@ -3,7 +3,7 @@ from specification import decode
 from specification import load
 
 
-with open("test_specification.spec", "r") as fp:
+with open("test_specification_spec.json", "r") as fp:
     s = fp.read()
 
 decoded = decode(s)

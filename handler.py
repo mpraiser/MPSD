@@ -15,3 +15,9 @@ def identity(x: bytes) -> bytes:
 def bytes2str(x: bytes) -> str:
     """interpret the bytes as ascii"""
     pass
+
+
+def hex2bytes(h: str) -> bytes:
+    return bytes(
+        int(h[i:i + 2], base=16) for i in range(0, len(h), 2)
+    )
