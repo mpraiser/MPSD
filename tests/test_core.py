@@ -1,5 +1,4 @@
-from section import byte, SizePolicy, ListLenPolicy, DependencySpec
-from specification import load
+from section import byte, SizePolicy, ListLenPolicy, DependencySpec, load
 from section import Section
 
 

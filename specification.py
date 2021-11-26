@@ -1,9 +1,8 @@
 import json
 import handler
-from typing import Optional
 from collections.abc import Callable
 
-from section import Section, SizePolicy, Unit
+from section import SizePolicy, Unit
 
 
 VARIABLE_SECTION_PREFIX = "@"
@@ -42,31 +41,6 @@ def is_valid_section(section: str):
 
 def is_variable_section(section: str):
     return section.startswith(VARIABLE_SECTION_PREFIX)
-
-
-def load(root_spec: dict, root_label: str = "") -> Section:
-    """Parse a spec dict to a Tree"""
-
-    def __spec_parse(spec: dict, label: str, parent: Optional[Section]) -> Section:
-        prop = spec[PROPERTIES]
-        node = Section(
-            label, None, prop["unit"], prop["size"], prop["handler"],
-            list_len=prop["list_len"], parent=parent,
-            is_variable_section=is_variable_section(label)
-        )
-
-        for child_label in spec:
-            if child_label == PROPERTIES:
-                continue
-            child = __spec_parse(spec[child_label], child_label, node)
-            if node.is_variable_section:
-                node.add_sub_section_template(child)
-            else:
-                node.add_child(child)
-        return node
-
-    root = __spec_parse(root_spec, root_label, None)
-    return root
 
 
 class Encoder(json.JSONEncoder):

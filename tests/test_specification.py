@@ -1,7 +1,6 @@
 from pprint import pprint
 from specification import decode
-from specification import load
-
+from section import load
 
 with open("test_specification_spec.json", "r") as fp:
     s = fp.read()

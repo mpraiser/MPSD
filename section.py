@@ -356,3 +356,36 @@ class Section:
             list_len += 1
         self.list_len = list_len
         return used
+
+
+def load(root_spec: dict, root_label: str = "") -> Section:
+    """Parse a specification dict to a Tree"""
+    from specification import PROPERTIES, is_variable_section
+
+    def __spec_parse(spec: dict, label: str, parent: Optional[Section]) -> Section:
+
+        prop = spec[PROPERTIES]
+        node = Section(
+            label, None, prop["unit"], prop["size"], prop["handler"],
+            list_len=prop["list_len"], parent=parent,
+            is_variable_section=is_variable_section(label)
+        )
+
+        for child_label in spec:
+            if child_label == PROPERTIES:
+                continue
+            child = __spec_parse(spec[child_label], child_label, node)
+            if node.is_variable_section:
+                node.add_sub_section_template(child)
+            else:
+                node.add_child(child)
+        return node
+
+    root = __spec_parse(root_spec, root_label, None)
+    return root
+
+
+def parse(spec: dict, raw: bytes) -> Section:
+    root = load(spec)
+    root.parse(raw)
+    return root
