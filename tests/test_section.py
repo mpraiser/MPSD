@@ -1,5 +1,5 @@
-from section import byte, SizePolicy, ListLenPolicy, DependencySpec, load
-from section import Section
+from structed import load
+from structed.section import byte, SizePolicy, ListLenPolicy, DependencySpec, Section
 
 
 def handler_type(x: bytes) -> str:
@@ -27,62 +27,90 @@ def handler_schedule_type_size(typ: bytes) -> int:
 
 
 case_spec = {
+    "_properties": {
+            "unit": byte,
+            "size": SizePolicy.auto,
+            "handler": None,
+            "list_len": None
+        },
     "header": {
+        "_properties": {
+            "unit": byte,
+            "size": SizePolicy.auto,
+            "handler": None,
+            "list_len": None
+        },
         "type": {
             "_properties": {
                 "unit": byte,
                 "size": 1,
-                "handler": handler_type
+                "handler": handler_type,
+                "list_len": None
             }
         },
         "payload_len": {
             "_properties": {
                 "unit": byte,
                 "size": 1,
-                "handler": handler_payload_len
+                "handler": handler_payload_len,
+                "list_len": None
             }
         }
     },
     "payload": {
         "_properties": {
-            "size": DependencySpec(lambda x: x, "payload_len")
+            "unit": byte,
+            "size": DependencySpec(lambda x: x, "payload_len"),
+            "handler": handler_payload_len,
+            "list_len": None
         },
 
         "main_address": {
             "_properties": {
                 "unit": byte,
                 "size": 2,
-                "handler": lambda x: x
+                "handler": lambda x: x,
+                "list_len": None
             }
         },
         "@schedules": {
             "_properties": {
                 "unit": byte,
                 "size": SizePolicy.auto,
+                "handler": None,
                 "list_len": ListLenPolicy.greedy,
             },
             "schedule_type": {
                 "_properties": {
                     "unit": byte,
                     "size": 1,
-                    "handler": lambda x: x
+                    "handler": lambda x: x,
+                    "list_len": None
                 }
             },
             "schedule_content": {
                 "_properties": {
                     "unit": byte,
                     "size": DependencySpec(handler_schedule_type_size, "schedule_type"),
-                    "handler": lambda x: x
+                    "handler": lambda x: x,
+                    "list_len": None
                 }
             }
         }
     },
     "footer": {
+        "_properties": {
+                "unit": byte,
+                "size": SizePolicy.auto,
+                "handler": None,
+                "list_len": None
+            },
         "mic": {
             "_properties": {
                 "unit": byte,
                 "size": 2,
-                "handler": lambda x: x
+                "handler": lambda x: x,
+                "list_len": None
             }
         }
     }
@@ -93,7 +121,7 @@ def child_labels(section: Section) -> list[str]:
     return [child.label for child in section.children]
 
 
-class TestCore:
+class TestSection:
     @staticmethod
     def secure_get_section(section: Section, label: str) -> Section:
         ret = section.find(label)
@@ -125,4 +153,5 @@ class TestCore:
 
 
 if __name__ == "__main__":
-    TestCore().test_parse()
+    import pytest
+    pytest.main(["test_section.py"])

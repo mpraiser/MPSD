@@ -1,5 +1,4 @@
-import pytest
-from dict_operations import dict_get, dict_struct_copy
+from structed.dict_operations import dict_get, dict_struct_copy
 
 
 class TestDictFunctions:
@@ -39,4 +38,5 @@ class TestDictFunctions:
 
 
 if __name__ == "__main__":
+    import pytest
     pytest.main(["test_dict_functions.py"])

@@ -1,8 +1,8 @@
 import json
-import handler
 from collections.abc import Callable
 
-from section import SizePolicy, Unit
+from structed import handler
+from structed.section import SizePolicy, Unit
 
 
 VARIABLE_SECTION_PREFIX = "@"

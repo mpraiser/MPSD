@@ -1,7 +1,7 @@
 from pprint import pprint
-from specification import decode
-from section import parse
-from handler import hex2bytes
+from structed import decode, parse
+from structed.handler import hex2bytes
+
 
 with open("udp.json", "r") as fp:
     spec = decode(fp.read())

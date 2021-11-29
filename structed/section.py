@@ -360,7 +360,7 @@ class Section:
 
 def load(root_spec: dict, root_label: str = "") -> Section:
     """Parse a specification dict to a Tree"""
-    from specification import PROPERTIES, is_variable_section
+    from structed.specification import PROPERTIES, is_variable_section
 
     def __spec_parse(spec: dict, label: str, parent: Optional[Section]) -> Section:
 
