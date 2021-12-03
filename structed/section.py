@@ -222,14 +222,18 @@ class Section:
         assert isinstance(self.size, tuple)
         handler, label = self.size
         # TODO: support multiple dependencies
+        dependency = self.get_dependency(label)
+        size = handler(dependency.value)
+        # self.size = size
+        return size
+
+    def get_dependency(self, label: str):
         dependency = self.find_in_ancestor_left_sub_tree(label)
         if not dependency:
             raise Exception(f"Dependency '{label}' is not found.")
         if not dependency.value:
             raise Exception(f"Dependency '{label}' is not parsed.")
-        size = handler(dependency.value)
-        # self.size = size
-        return size
+        return dependency
 
     def add_sub_section_template(self, sub_section_template):
         assert self.is_variable_section
@@ -282,7 +286,14 @@ class Section:
         self.raw = raw
         self.size = len(raw)
         if self.is_leaf():
-            self.value = self.handler(self.raw)
+            if isinstance(self.handler, Callable):
+                self.value = self.handler(self.raw)
+            elif isinstance(self.handler, tuple):
+                handler = self.handler[0]
+                labels = self.handler[1:]
+                values = tuple(self.get_dependency(label).value for label in labels)
+                self.value = handler(*values, self.raw)
+
         return self.size
 
     def __parse_non_variable(self, raw: bytes) -> int:

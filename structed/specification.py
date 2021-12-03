@@ -112,8 +112,12 @@ def check_properties(prop: dict, is_variable: bool):
     if "handler" not in prop:
         prop["handler"] = None
     else:
-        if is_callable(prop["handler"]):
-            prop["handler"] = handler_handler(prop["handler"])
+        if isinstance(prop["handler"], list):
+            prop["handler"][0] = handler_handler(prop["handler"][0])
+            prop["handler"] = tuple(prop["handler"])
+        elif isinstance(prop["handler"], str):
+            if is_callable(prop["handler"]):
+                prop["handler"] = handler_handler(prop["handler"])
 
     if "list_len" not in prop:
         if is_variable:
