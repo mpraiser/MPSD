@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Optional, Union
 from collections.abc import Callable, Iterable
 from collections import namedtuple, deque
-from functools import cache
+from functools import cache, partial
 
 
 class ParsingEnum(Enum):
@@ -61,7 +61,7 @@ class Section:
             parent: Optional = None,
             list_len: Optional[Union[int, SizePolicy, DependencySpec]] = None,
             is_variable_section: bool = False,
-            sub_sections_template: Optional[Iterable] = None
+            child_templates: Optional[Iterable] = None
     ):
         """
         :param label:
@@ -85,7 +85,7 @@ class Section:
         self.parent = parent if parent else None
 
         # template of sub-sections, only used in variable section
-        self.sub_sections_template = sub_sections_template if sub_sections_template else []
+        self.child_templates = child_templates if child_templates else []
 
         # properties for parsing
         self.handler = handler  # value = handler(raw)
@@ -96,9 +96,12 @@ class Section:
             if list_len is None:
                 raise Exception("Variable section must have a list_len (int or ListLenPolicy)!")
             self.list_len = list_len
+        else:
+            self.list_len = None
 
     def add_child(self, child):
         self.children.append(child)
+        child.parent = self
 
     def is_leaf(self):
         return len(self.children) == 0
@@ -222,12 +225,12 @@ class Section:
         assert isinstance(self.size, tuple)
         handler, label = self.size
         # TODO: support multiple dependencies
-        dependency = self.get_dependency(label)
+        dependency = self.get_dependency_section(label)
         size = handler(dependency.value)
         # self.size = size
         return size
 
-    def get_dependency(self, label: str):
+    def get_dependency_section(self, label: str):
         dependency = self.find_in_ancestor_left_sub_tree(label)
         if not dependency:
             raise Exception(f"Dependency '{label}' is not found.")
@@ -235,41 +238,32 @@ class Section:
             raise Exception(f"Dependency '{label}' is not parsed.")
         return dependency
 
-    def add_sub_section_template(self, sub_section_template):
-        assert self.is_variable_section
-        self.sub_sections_template.append(sub_section_template)
+    def handle_dependency(self, dependency_spec: tuple) -> Callable:
+        handler = dependency_spec[0]
+        labels = dependency_spec[1:]
+        dependencies = [self.get_dependency_section(label).value for label in labels]
+        return partial(handler, *dependencies)
 
-    def create_sub_section(self):
-        """create a child from template of sub-section, but not linked to parent"""
+    def add_child_template(self, sub_section_template):
         assert self.is_variable_section
-        sub_section = Section(
-            self.label[1:], None, self.unit, SizePolicy.auto, None,
+        self.child_templates.append(sub_section_template)
+
+    def create_actual_section(self, suffix: str):
+        """create an actual section from a variable section, but not linked to parent"""
+        from structed.specification import unwrap
+        assert self.is_variable_section
+        section = Section(
+            unwrap(self.label) + suffix, None, self.unit, self.size, self.handler,
         )
-        for template in self.sub_sections_template:
+        for template in self.child_templates:
             child = Section(
                 template.label, None, template.unit, template.size, template.handler,
-                parent=sub_section
+                parent=section,
+                is_variable_section=template.is_variable_section,
+                list_len=template.list_len
             )
-            sub_section.add_child(child)
-        return sub_section
-
-    def add_sub_section(self):
-        """create a child from template of sub-section"""
-        if not isinstance(self.list_len, int):
-            self.list_len = 0
-        label = self.label[1:] + f"[{self.list_len}]"  # ignore initial @, add [n]
-        sub_section = Section(
-            label, None, self.unit, SizePolicy.auto, None,
-            parent=self
-        )
-        for template in self.sub_sections_template:
-            child = Section(
-                template.label, None, template.unit, template.size, template.handler,
-                parent=sub_section
-            )
-            sub_section.add_child(child)
-        self.list_len += 1
-        return sub_section
+            section.add_child(child)
+        return section
 
     def parse(self, raw: bytes) -> int:
         """
@@ -291,7 +285,7 @@ class Section:
             elif isinstance(self.handler, tuple):
                 handler = self.handler[0]
                 labels = self.handler[1:]
-                values = tuple(self.get_dependency(label).value for label in labels)
+                values = tuple(self.get_dependency_section(label).value for label in labels)
                 self.value = handler(*values, self.raw)
 
         return self.size
@@ -349,7 +343,7 @@ class Section:
     def __parse_variable(self, raw: bytes) -> int:
         assert self.is_variable_section
         used = 0
-        list_len = 0
+        count = 0
         if isinstance(self.list_len, int):
             max_list_len = self.list_len
         elif isinstance(self.list_len, ListLenPolicy):
@@ -358,16 +352,18 @@ class Section:
                 max_list_len = None
             else:
                 raise Exception(f"Section '{self.label}' unsupported list len policy: {policy}")
+        elif isinstance(self.list_len, tuple):
+            max_list_len = self.handle_dependency(self.list_len)()
         else:
             raise Exception(f"Section '{self.label}' unsupported list len type: {type(self.size)}")
 
-        while used < len(raw) and ((not max_list_len) or max_list_len and list_len <= max_list_len):
-            sub_section = self.create_sub_section()
-            size = sub_section.parse(raw[used:])
+        while used < len(raw) and ((not max_list_len) or max_list_len and count <= max_list_len):
+            child = self.create_actual_section(str(count))
+            self.add_child(child)
+            size = child.parse(raw[used:])
             used += size
-            self.add_child(sub_section)
-            list_len += 1
-        self.list_len = list_len
+            count += 1
+        self.list_len = count
         return used
 
 
@@ -389,7 +385,7 @@ def load(root_spec: dict, root_label: str = "") -> Section:
                 continue
             child = __spec_parse(spec[child_label], child_label, node)
             if node.is_variable_section:
-                node.add_sub_section_template(child)
+                node.add_child_template(child)
             else:
                 node.add_child(child)
         return node
