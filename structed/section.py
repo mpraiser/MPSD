@@ -5,26 +5,28 @@ from collections import namedtuple, deque
 from functools import cache
 
 
-class Unit(Enum):
-    byte = "byte"
-    bit = "bit"
-
+class ParsingEnum(Enum):
     @classmethod
     def table(cls):
         return {
             item.value: item for item in cls
         }
 
-    @staticmethod
-    def from_str(s: str):
-        return Unit.table()[s]
+    @classmethod
+    def from_str(cls, s: str):
+        return cls.table()[s]
 
-    @staticmethod
-    def is_valid(s: str):
-        return s in Unit.table()
+    @classmethod
+    def is_valid(cls, s: str):
+        return s in cls.table()
 
 
-class SizePolicy(Enum):
+class Unit(ParsingEnum):
+    byte = "byte"
+    bit = "bit"
+
+
+class SizePolicy(ParsingEnum):
     """section size policy"""
     static = "static"  # fixed size
     auto = "auto"  # size is sum of children
@@ -32,7 +34,7 @@ class SizePolicy(Enum):
     dependency = "dependency"
 
 
-class ListLenPolicy(Enum):
+class ListLenPolicy(ParsingEnum):
     static = "static"  # fixed size
     greedy = "greedy"  # read as much bytes as possible
     dependency = "dependency"

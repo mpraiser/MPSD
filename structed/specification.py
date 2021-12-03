@@ -2,7 +2,7 @@ import json
 from collections.abc import Callable
 
 from structed import handler
-from structed.section import SizePolicy, Unit
+from structed.section import SizePolicy, ListLenPolicy, Unit
 
 
 VARIABLE_SECTION_PREFIX = "@"
@@ -27,6 +27,8 @@ def is_callable(label: str) -> bool:
 def handler_handler(s: str) -> Callable:
     """convert str to a Callable in module handler"""
     name = unwrap(s)
+    if name == "":
+        return getattr(handler, "identity")
     return getattr(handler, name)
 
 
@@ -96,16 +98,16 @@ def check_properties(prop: dict, is_variable: bool):
     else:
         if isinstance(prop["size"], list):
             if not is_callable(prop["size"][0]):
-                raise Exception(f"the first argument should be handler.")
+                raise Exception(f"When specify a dependency, the first argument should be handler.")
             else:
                 prop["size"][0] = handler_handler(prop["size"][0])
             prop["size"] = tuple(prop["size"])
 
         elif isinstance(prop["size"], str):
-            if Unit.is_valid(prop["size"]):
-                prop["size"] = Unit[prop["size"]]
-            else:
-                prop["size"] = int(prop["size"])
+            try:
+                prop["size"] = SizePolicy.from_str(prop["size"])
+            except KeyError:
+                raise Exception(f"Invalid size policy.")
 
     if "handler" not in prop:
         prop["handler"] = None
@@ -119,7 +121,18 @@ def check_properties(prop: dict, is_variable: bool):
         else:
             prop["list_len"] = None
     else:
-        pass
+        if isinstance(prop["list_len"], list):
+            if not is_callable(prop["list_len"][0]):
+                raise Exception(f"When specify a dependency, the first argument should be handler.")
+            else:
+                prop["list_len"][0] = handler_handler(prop["list_len"][0])
+            prop["list_len"] = tuple(prop["list_len"])
+
+        elif isinstance(prop["list_len"], str):
+            try:
+                prop["list_len"] = ListLenPolicy.from_str(prop["list_len"])
+            except KeyError:
+                raise Exception(f"Invalid list len policy.")
 
 
 def decode(s: str) -> dict:
@@ -136,3 +149,7 @@ def decode(s: str) -> dict:
         return dct
 
     return postorder(blank, "")
+
+
+def add_external_handler(func: Callable):
+    setattr(handler, func.__name__, func)

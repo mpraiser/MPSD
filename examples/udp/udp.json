@@ -25,10 +25,7 @@
     },
     "data": {
         "_properties": {
-            "size": [
-                "#identity",
-                "length"
-            ],
+            "size": ["#", "length"],
             "handler": "#bytes2hex"
         }
     }
