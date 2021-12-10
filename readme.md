@@ -2,7 +2,9 @@
 
 [TOC]
 
-## Definition
+## Introduction
+
+- Requirement: Python (>= 3.10)
 
 Parse messages of any protocols by a given structure description written in JSON.
 

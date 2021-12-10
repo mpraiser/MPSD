@@ -28,11 +28,11 @@ def handler_schedule_type_size(typ: bytes) -> int:
 
 case_spec = {
     "_properties": {
-            "unit": byte,
-            "size": SizePolicy.auto,
-            "handler": None,
-            "list_len": None
-        },
+        "unit": byte,
+        "size": SizePolicy.auto,
+        "handler": None,
+        "list_len": None
+    },
     "header": {
         "_properties": {
             "unit": byte,
@@ -100,11 +100,11 @@ case_spec = {
     },
     "footer": {
         "_properties": {
-                "unit": byte,
-                "size": SizePolicy.auto,
-                "handler": None,
-                "list_len": None
-            },
+            "unit": byte,
+            "size": SizePolicy.auto,
+            "handler": None,
+            "list_len": None
+        },
         "mic": {
             "_properties": {
                 "unit": byte,
@@ -154,4 +154,5 @@ class TestSection:
 
 if __name__ == "__main__":
     import pytest
+
     pytest.main(["test_section.py"])
