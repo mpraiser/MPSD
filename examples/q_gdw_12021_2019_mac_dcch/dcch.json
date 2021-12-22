@@ -1,0 +1,37 @@
+{
+    "header": {
+        "type": {
+            "_length": 1,
+            "_handler": "#handler_type"
+        },
+        "payload_len": {
+            "_length": 1,
+            "_handler": "#bytes2int_b"
+        }
+    },
+    "payload": {
+        "_length": ["#", "payload_len"],
+        "main_address": {
+            "_length": 2,
+            "_handler": "#bytes2hex"
+        },
+        "@schedules": {
+            "_size": "greedy",
+            "schedule_type": {
+                "_length": 1,
+                "_handler": "#handler_schedule_type"
+            },
+            "@schedule_content": {
+                "_length": ["#handler_schedule_type_size", "schedule_type"],
+                "_handler": ["#handler_schedule_type_content", "schedule_type"],
+                "_size": ["#handler_schedule_type_len", "schedule_type"]
+            }
+        }
+    },
+    "footer": {
+        "mic": {
+            "_length": 2,
+            "_handler": "#"
+        }
+    }
+}

@@ -1,79 +1,15 @@
+"""
+main datastructure: field and specification
+"""
+
 from __future__ import annotations  # to allow forward references in type hint
 from typing import Optional, Callable, Any
 from collections.abc import Sequence, Iterator
-from enum import Enum
+from functools import partial
 
 from structed import predefined
-from structed.predefined import check_and_get
-
-
-class ConstructableMixin(Enum):
-    @classmethod
-    def table(cls):
-        return {
-            item.value: item for item in cls
-        }
-
-    @classmethod
-    def from_str(cls, s: str):
-        return cls.table()[s]
-
-    @classmethod
-    def is_valid(cls, s: str):
-        return s in cls.table()
-
-
-class LenPolicy(ConstructableMixin):
-    """field length policy"""
-    fixed = "fixed"
-    auto = "auto"  # length is sum of children fields
-    greedy = "greedy"
-    dependency = "dependency"
-
-
-class SizePolicy(ConstructableMixin):
-    """field size policy, used in variable field"""
-    fixed = "fixed"  # imply a non-variable field
-    greedy = "greedy"
-    dependency = "dependency"
-
-
-class Dependency:
-    def __init__(self, spec: tuple):
-        assert len(spec) >= 1
-        self.handler = spec[0]
-        self.args = spec[1:]
-        assert isinstance(self.handler, Callable)
-
-
-class Tree:
-    def __init__(self, parent: Optional[Tree], children: Optional[Iterator[Tree]]):
-        self.parent = parent
-        self.children = tuple(children) if children else tuple()
-
-    @property
-    def is_root(self):
-        return self.parent is None
-
-    @property
-    def is_leaf(self):
-        return len(self.children) == 0
-
-    def find(self, condition: Callable) -> Optional[Tree]:
-        if condition(self):
-            return self
-        for child in self.children:
-            result = child.find(condition)
-            if result:
-                return result
-        return None
-
-    def add_children(self, *children: Tree) -> Tree:
-        tmp = list(self.children)
-        for child in children:
-            tmp.append(child)
-        self.children = tuple(tmp)
-        return self
+from structed.common import LenPolicy, SizePolicy, Dependency, Tree
+from structed.predefined import check_and_get, unwrap
 
 
 class Field(Tree):
@@ -88,6 +24,11 @@ class Field(Tree):
             is_virtual: bool = False,
             virtual_length: Optional[int] = None
     ):
+        """
+        virtual is used in 2 situations:
+        1. LenPolicy.auto, after parsing actualize() should be called.
+        2. Structural variable.
+        """
         super().__init__(parent, children)
         self.name = name
         self.raw = raw
@@ -100,6 +41,9 @@ class Field(Tree):
                 raise Exception(f"Only raw of virtual field can be None.")
             if virtual_length is not None:
                 raise Exception(f"Only virtual field can have attribute virtual_length.")
+        else:
+            if virtual_length is None:
+                self.virtual_length = 0
 
     @property
     def length(self):
@@ -128,8 +72,9 @@ class Field(Tree):
             raise Exception(f"Cannot get value from non-leaf field '{field.name}'.")
         return field.value
 
-    def handle_dependency(self, dependency: Dependency) -> Any:
-        return dependency.handler(
+    def handle_dependency(self, dependency: Dependency) -> Callable:
+        return partial(
+            dependency.handler,
             *(self.get(x) for x in dependency.args)
         )
 
@@ -147,15 +92,15 @@ class Field(Tree):
         return self
 
 
-class FieldScaffold(Tree):
+class Specification(Tree):
     def __init__(
             self,
             name: str,
             length: int | LenPolicy | Dependency,
-            size: None | SizePolicy | Dependency,
-            handler: Optional[Callable],
-            parent: Optional[FieldScaffold],
-            children: Optional[Iterator[FieldScaffold]]
+            size: Optional[SizePolicy | Dependency],
+            handler: Optional[Callable | Dependency],
+            parent: Optional[Specification],
+            children: Optional[Iterator[Specification]]
     ):
         super().__init__(parent, children)
         self.name = name
@@ -171,15 +116,26 @@ class FieldScaffold(Tree):
     def is_length_variable(self) -> bool:
         return not isinstance(self.size, int)
 
-    @property
-    def structural_template(self) -> FieldScaffold:
-        return FieldScaffold(
-            self.name, self.length, None, self.handler, self.parent, self.children
+    def structural_template(self, count: int) -> Specification:
+        """rename and erase the size policy"""
+        name = unwrap(self.name) + f"[{count}]"
+        return Specification(
+            name, self.length, None, self.handler, self.parent, self.children
         )
 
-    def parse_value(self, raw: Sequence) -> Any:
+    def parse_value(self, raw: Sequence, pf: Field) -> Any:
+        """
+        parse value of field
+        :param raw:
+        :param pf: partially parsed field
+        :return: parsed value
+        """
         if self.is_leaf:
-            return self.handler(raw)
+            if isinstance(self.handler, Callable):
+                return self.handler(raw)
+            elif isinstance(self.handler, Dependency):
+                assert pf is not None
+                return pf.handle_dependency(self.handler)(raw)
         else:
             return None
 
@@ -211,12 +167,12 @@ class FieldScaffold(Tree):
     def __parse_len_policy_fixed(self, raw: Sequence, parent: Optional[Field]) -> Field:
         raw = raw[:self.length]
         field = Field(
-            self.name, raw, self.parse_value(raw), parent, None
+            self.name, raw, self.parse_value(raw, parent), parent, None
         )
 
         used = 0
         for cs in self.children:
-            cs: FieldScaffold
+            cs: Specification
             cf = cs.parse(field.raw[used:], field)
             used += cf.length
             field = field.add_children(cf)
@@ -225,15 +181,15 @@ class FieldScaffold(Tree):
         return field
 
     def __parse_len_policy_dependency(self, raw: Sequence, parent: Optional[Field]) -> Field:
-        length = parent.handle_dependency(self.length)
+        length = parent.handle_dependency(self.length)()
         raw = raw[:length]
         field = Field(
-            self.name, raw, self.parse_value(raw), parent, None
+            self.name, raw, self.parse_value(raw, parent), parent, None
         )
 
         used = 0
         for cs in self.children:
-            cs: FieldScaffold
+            cs: Specification
             cf = cs.parse(field.raw[used:], field)
             used += cf.length
             field = field.add_children(cf)
@@ -249,12 +205,12 @@ class FieldScaffold(Tree):
 
         used = 0
         for cs in self.children:
-            cs: FieldScaffold
+            cs: Specification
             cf = cs.parse(raw[used:], field)
             used += cf.length
             field = field.add_children(cf)
         raw = raw[:used]
-        field = field.actualize(raw, self.parse_value(raw))
+        field = field.actualize(raw, self.parse_value(raw, parent))
         return field
 
     def __parse_len_policy_greedy(self, raw: Sequence, parent: Optional[Field]) -> Field:
@@ -280,9 +236,11 @@ class FieldScaffold(Tree):
 
     def __parse_size_policy_dependency(self, raw: Sequence, virtual: Optional[Field]) -> Field:
         used = 0
-        size = virtual.handle_dependency(self.size)
+        size = virtual.handle_dependency(self.size)()
         for _ in range(size):
-            cs = self.structural_template.parse(raw[used:], virtual)
+            cs = self\
+                .structural_template(len(virtual.children))\
+                .parse(raw[used:], virtual)
             used += cs.length
             virtual = virtual.add_children(cs)
         return virtual.set_virtual_length(used)
@@ -290,7 +248,9 @@ class FieldScaffold(Tree):
     def __parse_size_policy_greedy(self, raw: Sequence, virtual: Optional[Field]) -> Field:
         used = 0
         while used < len(raw):
-            cs = self.structural_template.parse(raw[used:], virtual)
+            cs = self\
+                .structural_template(len(virtual.children))\
+                .parse(raw[used:], virtual)
             used += cs.length
             virtual = virtual.add_children(cs)
         return virtual.set_virtual_length(used)
@@ -299,10 +259,10 @@ class FieldScaffold(Tree):
 def load(
         spec: dict,
         name: str = "root",
-        parent: Optional[FieldScaffold] = None
-) -> FieldScaffold:
+        parent: Optional[Specification] = None
+) -> Specification:
     """unpack the properties in spec"""
-    prop = check_and_get(spec, name, predefined.PROPERTIES)
+    prop = check_and_get(spec, name, predefined.I_PROPERTIES)
     length = check_and_get(prop, name, predefined.LENGTH)
     size = check_and_get(prop, name, predefined.SIZE)
     handler = check_and_get(prop, name, predefined.HANDLER)
@@ -327,24 +287,27 @@ def load(
             else:
                 raise Exception(f"invalid size policy of field '{name}': {size}.")
         elif isinstance(size, tuple):
-            size = Dependency(length)
-
+            size = Dependency(size)
         else:
             raise Exception(f"invalid size type of field '{name}': {size}")
 
+    if handler is not None:
+        if isinstance(handler, tuple):
+            handler = Dependency(handler)
+
     # recursively build the scaffold
-    fs = FieldScaffold(
+    fs = Specification(
         name, length, size, handler, parent, None
     )
     children = []
     for child_name, child_spec in spec.items():
-        if child_name != predefined.PROPERTIES:
+        if child_name != predefined.I_PROPERTIES:
             children.append(load(child_spec, child_name, fs))
     return fs.add_children(*children)
 
 
 def parse(
-        scaffold: FieldScaffold,
+        scaffold: Specification,
         raw: Sequence,
         parent: Optional[Field] = None
 ) -> Field:

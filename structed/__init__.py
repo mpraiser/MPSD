@@ -1,2 +1,2 @@
-from .specification import decode
-from .section import parse, load
+from .field import load, parse
+from .json_codec import decode, add_external_handler
