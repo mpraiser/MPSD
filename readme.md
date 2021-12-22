@@ -5,16 +5,19 @@
 ## Introduction
 
 - Requirement: Python (>= 3.10)
+- Functionality: Parse messages of any protocols by a given structure description.
 
-Parse messages of any protocols by a given structure description written in JSON.
+`Specification` and `Field` are the main objects. `Specification` is the recursively defined structure of message. `Field` contains the parsed result, also recursively. 
 
-`Section` is the main data structure, representing sections of a message. Section is basically a tree, the root section for the whole bytes. The fundamental structure of sections is defined and decoded from the JSON description file.
+The message may contain field with variability, of *structural* or *length*. The basic structure is defined in `Specification`, while the final structure and length of each field will be deduced during parsing.
 
-**JSON** --decode-> **dict** --load-> **Section** 
+`parse()` takes the specification and the *sequence* to be parsed. The procedure follows:
 
-The final structure and values are determined during parsing.
+**Spec, raw** --parse-> **Field**
 
-**Section, raw_bytes** --parse-> **Section**
+JSON is used to store the serialized specification. Use `decode()` to decode it as an intermediate `dict`, then use `load()` to generate the specification.
+
+**JSON** --decode-> **dict** --load-> **Spec** 
 
 
 ## Example
@@ -30,37 +33,24 @@ The structure description in `udp.json` will be
 ```json
 {
     "src_port": {
-        "_properties": {
-            "size": 2,
-            "handler": "#bytes2int_b"
-        }
+        "_length": 2,
+        "_handler": "#bytes2int_b"
     },
     "dst_port": {
-        "_properties": {
-            "size": 2,
-            "handler": "#bytes2int_b"
-        }
+        "_length": 2,
+        "_handler": "#bytes2int_b"
     },
     "length": {
-        "_properties": {
-            "size": 2,
-            "handler": "#bytes2int_b"
-        }
+        "_length": 2,
+        "_handler": "#bytes2int_b"
     },
     "checksum": {
-        "_properties": {
-            "size": 2,
-            "handler": "#bytes2int_b"
-        }
+        "_length": 2,
+        "_handler": "#bytes2int_b"
     },
     "data": {
-        "_properties": {
-            "size": [
-                "#identity",
-                "length"
-            ],
-            "handler": "#bytes2hex"
-        }
+        "_length": ["#", "length"],
+        "_handler": "#bytes2hex"
     }
 }
 ```
@@ -68,24 +58,19 @@ The structure description in `udp.json` will be
 We've got a raw message of bytes, and parse it.
 
 ```py
-from structed import decode, parse
+from structed import decode, parse, load
 
 with open("udp.json", "r") as fp:
-    spec = decode(fp.read())
+    spec = load(decode(fp.read()))
 
 raw = b"09\x1f@\x00N\xd2\x0f X\x86o\xff\xce\xd0k\xe2\x12\xbe\xfdQ\xb9L5\xd4\xd5\x16V\x8f\xc6\xb2\xdeS\xd9\xa4\xbff]tz\xa7\xf6=\xa1\xa9)\x82\xf2y\x96\xb0\xf8L\xa9\xc4\xa8z\xf7\xd3 \x88d\xb3\\\x17\xe2\x07\xd5'\x88\xaf\xc2p\xa3Y\xfcI\x8e"
 message = parse(spec, raw)
-```
-
-`message` is an instance of `Section` and can be turned into a dict to view all the parsed values, simply by
-
-```py
 print(dict(message))
 ```
 
-The result is
+`message` can be converted into a dict to view all the parsed values, simply by `dict()`. The result is
 
-```py
+```profile
 {
     "src_port": 12345,
     "dst_port": 8000,
