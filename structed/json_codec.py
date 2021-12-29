@@ -87,5 +87,11 @@ def add_external_handler(func: Callable):
     setattr(handler, func.__name__, func)
 
 
+def add_external_handlers_from(mod):
+    for func in mod.__dict__.values():
+        if callable(func):
+            add_external_handler(func)
+
+
 def decode(raw: str) -> dict:
     return Decoder().decode(raw)
