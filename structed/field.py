@@ -119,9 +119,16 @@ class Specification(Tree):
     def structural_template(self, count: int) -> Specification:
         """rename and erase the size policy"""
         name = unwrap(self.name) + f"[{count}]"
-        return Specification(
-            name, self.length, None, self.handler, self.parent, self.children
-        )
+        return self.template(name, self.length, None)
+
+    def template(
+            self,
+            name: str,
+            length: int | LenPolicy | Dependency,
+            size: Optional[SizePolicy | Dependency]
+    ) -> Specification:
+        """intermediate message structure"""
+        return Specification(name, length, size, self.handler, self.parent, self.children)
 
     def parse_value(self, raw: Sequence, pf: Field) -> Any:
         """
@@ -182,20 +189,7 @@ class Specification(Tree):
 
     def __parse_len_policy_dependency(self, raw: Sequence, parent: Optional[Field]) -> Field:
         length = parent.handle_dependency(self.length)()
-        raw = raw[:length]
-        field = Field(
-            self.name, raw, self.parse_value(raw, parent), parent, None
-        )
-
-        used = 0
-        for cs in self.children:
-            cs: Specification
-            cf = cs.parse(field.raw[used:], field)
-            used += cf.length
-            field = field.add_children(cf)
-        if not self.is_leaf and used < field.length:
-            print(f"Warning: child fields does not used all bytes of field '{field.name}'.")
-        return field
+        return self.template(self.name, length, self.size).__parse(raw, parent)
 
     def __parse_len_policy_auto(self, raw: Sequence, parent: Optional[Field]) -> Field:
         field = Field(
